@@ -100,27 +100,92 @@ The clone source VM must be built correctly or customization silently hangs:
 
 ```hcl
 vsphere_user     = "administrator@vsphere.local"
-vsphere_server   = ""
-vsphere_password = ""
+vsphere_password = "*****"
+vsphere_server   = "x.x.x.x"
 
-default_firmware  = "bios"
-default_vm_domain = "local"
+default_firmware = "bios"
+default_vm_domain = "local" 
+
+datacenters = {
+  "datacenter1" = "datacenter1"
+}
+clusters = {
+  "cluster1" = { 
+    datacenter_key = "datacenter1" 
+    }
+}
+
+esxi_hosts = {
+  "x.x.x.x" = {
+    datacenter_key = "datacenter1"
+    cluster_key    = "cluster1"
+    username       = ""
+    password       = "*****"
+    devices        = ["vmnic1", "vmnic2"]
+  },
+   "x.x.x.x" = {
+    datacenter_key = "datacenter1"
+    cluster_key    = "cluster1"
+    username       = ""
+    password       = "*****"
+    devices        = ["vmnic1", "vmnic2"]
+  }
+}
+
+datastores = {
+  "datastore1 (1)" = { 
+    datacenter_key = "datacenter1" 
+    }
+}
+
+vswitches = {
+  "vswitch1" = { 
+    datacenter_key = "datacenter1" 
+  }
+}
+
+port_groups = {
+  "pg-vlan10-mgmt" = { 
+    vswitch_key = "vswitch1"
+    vlan_id = 10 
+    }
+  "pg-vlan20-app"  = { 
+    vswitch_key = "vswitch1"
+    vlan_id = 20 
+    }
+}
 
 vms = {
-  "db" = {
+  "app1" = {
     datacenter_key = "datacenter1"
     cluster_key    = "cluster1"
     datastore_key  = "datastore1 (1)"
-    network_keys   = ["pg-vlan20-app"]
-    nic_ips        = ["192.168.20.60"]
+    network_keys   = ["VM Network", "pg-vlan20-app"]
+    nic_ips        = ["x.x.x.x", "x.x.x.x"]
     subnet_mask    = 24
-    gateway        = "192.168.20.1"
+    gateway        = "x.x.x.x"
     num_cpus       = 2
     memory         = 8096
     disk_size      = 100
     guest_id       = "centos9_64Guest"
     template_name  = "centos-template-vm"
-    vm_domain      = "db.local"
+    vm_domain      = "app1.local"
+    firmware       = "bios"
+  },
+  "app2" = {
+    datacenter_key = "datacenter1"
+    cluster_key    = "cluster1"
+    datastore_key  = "datastore1 (1)"
+    network_keys   = ["VM Network", "pg-vlan10-mgmt", "pg-vlan20-app"]
+    nic_ips        = ["x.x.x.x", "x.x.x.x", "x.x.x.x"]
+    subnet_mask    = 24
+    gateway        = "x.x.x.x"
+    num_cpus       = 2
+    memory         = 8096
+    disk_size      = 100
+    guest_id       = "centos9_64Guest"
+    template_name  = "centos-template-vm"
+    vm_domain      = "app2.local"
     firmware       = "bios"
   }
 }
