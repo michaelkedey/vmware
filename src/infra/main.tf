@@ -92,13 +92,12 @@ module "vm" {
 
   vms = {
     (each.key) = {
-      template_uuid = data.vsphere_virtual_machine.template[each.key].id
-      num_cpus      = each.value.num_cpus
-      memory        = each.value.memory
-      guest_id      = each.value.guest_id
-      firmware      = each.value.firmware
-      vm_domain     = lookup(each.value, "vm_domain", null)
-      #ipv4_gateway    = anytrue([for k in each.value.network_keys : k != "VM Network"]) ? each.value.gateway : null
+      template_uuid   = data.vsphere_virtual_machine.template[each.key].id
+      num_cpus        = each.value.num_cpus
+      memory          = each.value.memory
+      guest_id        = each.value.guest_id
+      firmware        = each.value.firmware
+      vm_domain       = lookup(each.value, "vm_domain", null)
       ipv4_gateway    = each.value.gateway
       dns_server_list = lookup(each.value, "dns_server_list", ["8.8.8.8", "1.1.1.1"])
 
@@ -108,7 +107,16 @@ module "vm" {
       #     ipv4_address = each.value.nic_ips[idx]
       #     ipv4_netmask = each.value.subnet_mask
       #   }
-      # ]
+      # ]]
+      networks = [
+        for idx, net_key in each.value.network_keys : {
+          network_id   = net_key == "VM Network" ? data.vsphere_network.default_network["VM Network"].id : module.port_group[net_key].port_group_ids[net_key]
+          ipv4_address = each.value.nic_ips[idx]
+          ipv4_netmask = each.value.subnet_mask
+        }
+      ]
+
+      ipv4_gateway = each.value.gateway
 
       networks = [
         for idx, net_key in each.value.network_keys : {
