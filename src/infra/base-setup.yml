@@ -1,0 +1,170 @@
+---
+- name: Enterprise Base Setup, Dev Tools, Java, Node.js, Fail2ban, and Hardening
+  hosts: servers
+  become: yes
+
+  tasks:
+    - name: Ensure EPEL repository is installed
+      dnf:
+        name: epel-release
+        state: present
+
+    - name: Enable CRB (CodeReady Builder) repository
+      command: dnf config-manager --set-enabled crb
+      args:
+        creates: /etc/yum.repos.d/centos-crb.repo
+
+    - name: Ensure DNF cache is updated
+      dnf:
+        update_cache: yes
+
+    - name: Install Development Tools group
+      dnf:
+        name: "@Development Tools"
+        state: present
+
+    - name: Install essential utilities, build tools, and development headers
+      dnf:
+        name:
+          - wget
+          - vim
+          - net-tools
+          - bind-utils
+          - psmisc
+          - unzip
+          - gcc
+          - gcc-c++
+          - make
+          - automake
+          - autoconf
+          - binutils
+          - libtool
+          - pkg-config
+          - zlib
+          - zlib-devel
+          - readline-devel
+          - bzip2
+          - bzip2-devel
+          - libjpeg-devel
+          - libxml2-devel
+          - libxslt-devel
+          - libevent-devel
+          - cyrus-sasl-devel
+          - openldap-devel
+          - openssl-devel
+          - libffi-devel
+          - libicu-devel
+          - perl
+          - perl-IPC-Run
+          - perl-ExtUtils-MakeMaker
+          - docbook-dtds
+          - docbook-xsl
+          - docbook-utils
+          - opensp
+          - openjade
+          - xmlto
+          - bison
+          - flex
+          - m4
+        state: present
+
+    - name: Install Java Development Kit (JDK)
+      dnf:
+        name: java-latest-openjdk-devel
+        state: present
+
+    - name: Add NodeSource repository for Node.js 20
+      shell: curl -sL https://rpm.nodesource.com/setup_20.x | bash -
+      args:
+        creates: /etc/yum.repos.d/nodesource-all.repo
+
+    - name: Install Node.js
+      dnf:
+        name: nodejs
+        state: present
+
+    - name: Ensure firewalld is installed
+      dnf:
+        name: firewalld
+        state: present
+
+    - name: Start and enable firewalld service
+      systemd:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Install fail2ban
+      dnf:
+        name: fail2ban
+        state: present
+
+    - name: Start and enable fail2ban service
+      systemd:
+        name: fail2ban
+        state: started
+        enabled: yes
+
+    - name: Configure fail2ban jail for SSH defense
+      copy:
+        dest: /etc/fail2ban/jail.local
+        content: |
+          [DEFAULT]
+          bantime = 1h
+          findtime = 10m
+          maxretry = 5
+
+          [sshd]
+          enabled = true
+      notify: Restart fail2ban
+
+    - name: OS Hardening - Disable root SSH login
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitRootLogin'
+        line: 'PermitRootLogin no'
+        state: present
+      notify: Restart SSH
+
+    - name: OS Hardening - Force SSH Key Authentication (Disable Passwords)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+        state: present
+      notify: Restart SSH
+
+    - name: OS Hardening - Enforce secure default umask
+      lineinfile:
+        path: /etc/profile
+        regexp: '^umask '
+        line: 'umask 027'
+        state: present
+
+    - name: OS Hardening - Apply secure kernel parameters (sysctl)
+      sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: yes
+      loop:
+        - { key: 'net.ipv4.conf.all.rp_filter', value: '1' }
+        - { key: 'net.ipv4.conf.default.rp_filter', value: '1' }
+        - { key: 'net.ipv4.tcp_syncookies', value: '1' }
+        - { key: 'net.ipv4.conf.all.accept_source_route', value: '0' }
+        - { key: 'net.ipv4.conf.default.accept_source_route', value: '0' }
+        - { key: 'net.ipv4.conf.all.accept_redirects', value: '0' }
+        - { key: 'net.ipv4.conf.default.accept_redirects', value: '0' }
+        - { key: 'fs.protected_hardlinks', value: '1' }
+        - { key: 'fs.protected_symlinks', value: '1' }
+
+  handlers:
+    - name: Restart SSH
+      service:
+        name: sshd
+        state: restarted
+
+    - name: Restart fail2ban
+      service:
+        name: fail2ban
+        state: restarted
