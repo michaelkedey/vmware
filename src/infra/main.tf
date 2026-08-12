@@ -101,13 +101,6 @@ module "vm" {
       ipv4_gateway    = each.value.gateway
       dns_server_list = lookup(each.value, "dns_server_list", ["8.8.8.8", "1.1.1.1"])
 
-      # networks = [
-      #   for idx, net_key in each.value.network_keys : {
-      #     network_id   = net_key == "VM Network" ? data.vsphere_network.default_network["VM Network"].id : module.port_group[net_key].port_group_ids[net_key]
-      #     ipv4_address = each.value.nic_ips[idx]
-      #     ipv4_netmask = each.value.subnet_mask
-      #   }
-      # ]]
       networks = [
         for idx, net_key in each.value.network_keys : {
           network_id   = net_key == "VM Network" ? data.vsphere_network.default_network["VM Network"].id : module.port_group[net_key].port_group_ids[net_key]
@@ -116,15 +109,14 @@ module "vm" {
         }
       ]
 
-      ipv4_gateway = each.value.gateway
 
-      networks = [
-        for idx, net_key in each.value.network_keys : {
-          network_id   = net_key == "VM Network" ? data.vsphere_network.default_network["VM Network"].id : module.port_group[net_key].port_group_ids[net_key]
-          ipv4_address = net_key == "VM Network" ? null : each.value.nic_ips[idx]
-          ipv4_netmask = net_key == "VM Network" ? null : each.value.subnet_mask
-        }
-      ]
+      # networks = [
+      #   for idx, net_key in each.value.network_keys : {
+      #     network_id   = net_key == "VM Network" ? data.vsphere_network.default_network["VM Network"].id : module.port_group[net_key].port_group_ids[net_key]
+      #     ipv4_address = net_key == "VM Network" ? null : each.value.nic_ips[idx]
+      #     ipv4_netmask = net_key == "VM Network" ? null : each.value.subnet_mask
+      #   }
+      # ]
 
       disks = [
         {
