@@ -1,0 +1,31 @@
+---
+- name: Configure PostgreSQL servers
+  hosts: servers
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Configure PostgreSQL
+      block:
+
+        - name: Copy PostgreSQL installation script
+          ansible.builtin.copy:
+            src: ./postgres_centos_stream_10.sh
+            dest: /tmp/postgres_config.sh
+            mode: '0755'
+
+        - name: Run PostgreSQL installation script
+          ansible.builtin.command:
+            cmd: /tmp/postgres_config.sh
+          register: postgres_result
+
+        - name: Show PostgreSQL script output
+          ansible.builtin.debug:
+            var: postgres_result.stdout_lines
+
+      always:
+
+        - name: Remove PostgreSQL installation script
+          ansible.builtin.file:
+            path: /tmp/postgres_config.sh
+            state: absent

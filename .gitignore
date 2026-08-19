@@ -43,3 +43,4 @@ terraform.rc
 # Uncomment the line below if you want to ignore planout files.
 # planout
 .teraform.tfvars
+postgres_centos_stream_10.sh
