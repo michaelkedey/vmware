@@ -23,8 +23,6 @@ cat << EOF > inventory.ini
 [servers]
 EOF
 
-echo "[servers]" > inventory.ini
-
 terraform output -json vm_guest_ips | jq -r '
   to_entries[] | 
   . as $parent | 
@@ -34,7 +32,7 @@ terraform output -json vm_guest_ips | jq -r '
   "\($parent.key) \(. )"
 ' | while read -r name ip; do
     if [ -n "$ip" ]; then
-        echo "$name ansible_host=$ip ansible_user=admin" >> inventory.ini
+        echo "$name ansible_host=$ip ansible_user=pbx" >> inventory.ini
         echo "Discovered and added: $name ($ip)"
     fi
 done
@@ -44,9 +42,35 @@ echo "Generated inventory.ini preview:"
 cat inventory.ini
 echo ""
 
-echo "Running Ansible Playbook"
+# --- INTERACTIVE OS SELECTOR ---
+echo "========================================="
+echo "Select the Target Operating System:"
+echo "1) Rocky Linux / RHEL / CentOS"
+echo "2) Debian / Ubuntu"
+echo "========================================="
+read -p "Enter choice [1 or 2]: " os_choice
+
+case $os_choice in
+    1)
+        PLAYBOOK="base-setup-rocky.yml"
+        echo "Selected Rocky/RHEL playbook."
+        ;;
+    2)
+        PLAYBOOK="base-setup-debian.yml"
+        echo "Selected Debian/Ubuntu playbook."
+        ;;
+    *)
+        echo "Invalid choice. Exiting."
+        exit 1
+        ;;
+esac
+
+echo ""
+echo "Running Ansible Playbook: $PLAYBOOK"
 export ANSIBLE_HOST_KEY_CHECKING=False
-ansible-playbook -i inventory.ini base-setup.yml --ask-become-pass
+
+# Runs the chosen playbook
+ansible-playbook -i inventory.ini "$PLAYBOOK" --ask-become-pass
 
 echo ""
 if [ $? -eq 0 ]; then
@@ -57,4 +81,3 @@ else
     echo "Ansible encountered errors during execution."
     exit 1
 fi
-

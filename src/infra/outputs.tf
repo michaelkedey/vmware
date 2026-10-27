@@ -11,7 +11,7 @@ output "vm_guest_ips" {
   value       = { for k, m in module.vm : k => m.vm_guest_ip_addresses }
 }
 
-output "ssh_commands" {
-  description = "Quick copy-paste SSH login strings using the first discovered guest IP"
-  value       = { for k, m in module.vm : k => "ssh admin@${m.vm_guest_ip_addresses[k][0]}" }
-}
+#output "ssh_commands" {
+#  description = "Quick copy-paste SSH login strings using the first discovered guest IP"
+#  value       = { for k, m in module.vm : k => "ssh admin@${m.vm_guest_ip_addresses[k][0]}" }
+#}

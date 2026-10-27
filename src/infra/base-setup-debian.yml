@@ -1,0 +1,148 @@
+---
+- name: Enterprise Base Setup, Dev Tools, Java, Node.js, Fail2ban, and Hardening (Debian/Ubuntu)
+  hosts: servers
+  become: yes
+
+  tasks:
+    - name: Ensure system time synchronization is active
+      ansible.builtin.systemd:
+        name: systemd-timesyncd
+        state: started
+        enabled: yes
+      ignore_errors: yes
+
+    - name: Ensure APT cache is updated
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install Development Tools and Build Essentials
+      ansible.builtin.apt:
+        name: build-essential
+        state: present
+
+    - name: Install comprehensive build tools, utilities, and development headers
+      ansible.builtin.apt:
+        name:
+          - wget
+          - vim
+          - net-tools
+          - dnsutils
+          - psmisc
+          - unzip
+          - gcc
+          - g++
+          - make
+          - automake
+          - autoconf
+          - binutils
+          - libtool
+          - pkg-config
+          - zlib1g
+          - zlib1g-dev
+          - libreadline-dev
+          - bzip2
+          - libbz2-dev
+          - libjpeg-dev
+          - libxml2-dev
+          - libxslt1-dev
+          - libevent-dev
+          - libsasl2-dev
+          - libldap2-dev
+          - libssl-dev
+          - libffi-dev
+          - libicu-dev
+          - perl
+          - libipc-run-perl
+          - docbook-to-man
+          - xsltproc
+          - bison
+          - flex
+          - m4
+          - firewalld
+          - fail2ban
+        state: present
+
+    - name: Install Java Development Kit (JDK)
+      ansible.builtin.apt:
+        name: default-jdk
+        state: present
+
+    - name: Add NodeSource repository for Node.js 20
+      ansible.builtin.shell: |
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+      args:
+        creates: /etc/apt/sources.list.d/nodesource.list
+
+    - name: Install Node.js
+      ansible.builtin.apt:
+        name: nodejs
+        state: present
+
+    - name: Start and enable firewalld and fail2ban services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - firewalld
+        - fail2ban
+
+    - name: Configure fail2ban jail for SSH defense
+      ansible.builtin.copy:
+        dest: /etc/fail2ban/jail.local
+        content: |
+          [DEFAULT]
+          bantime = 1h
+          findtime = 10m
+          maxretry = 5
+
+          [sshd]
+          enabled = true
+      notify: Restart fail2ban
+
+    - name: OS Hardening - Disable root SSH login and Password Authentication
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+      loop:
+        - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
+        - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+      notify: Restart SSH
+
+    - name: OS Hardening - Enforce secure default umask
+      ansible.builtin.lineinfile:
+        path: /etc/profile
+        regexp: '^umask '
+        line: 'umask 027'
+        state: present
+
+    - name: OS Hardening - Apply secure kernel parameters (sysctl)
+      ansible.builtin.sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: yes
+      loop:
+        - { key: 'net.ipv4.conf.all.rp_filter', value: '1' }
+        - { key: 'net.ipv4.conf.default.rp_filter', value: '1' }
+        - { key: 'net.ipv4.tcp_syncookies', value: '1' }
+        - { key: 'net.ipv4.conf.all.accept_source_route', value: '0' }
+        - { key: 'net.ipv4.conf.default.accept_source_route', value: '0' }
+        - { key: 'net.ipv4.conf.all.accept_redirects', value: '0' }
+        - { key: 'net.ipv4.conf.default.accept_redirects', value: '0' }
+        - { key: 'fs.protected_hardlinks', value: '1' }
+        - { key: 'fs.protected_symlinks', value: '1' }
+
+  handlers:
+    - name: Restart SSH
+      ansible.builtin.service:
+        name: ssh
+        state: restarted
+
+    - name: Restart fail2ban
+      ansible.builtin.service:
+        name: fail2ban
+        state: restarted

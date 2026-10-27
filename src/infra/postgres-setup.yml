@@ -5,27 +5,42 @@
   gather_facts: true
 
   tasks:
-    - name: Configure PostgreSQL
-      block:
 
-        - name: Copy PostgreSQL installation script
-          ansible.builtin.copy:
-            src: ./postgres_centos_stream_10.sh
-            dest: /tmp/postgres_config.sh
-            mode: '0755'
+    - name: Check PostgreSQL service
+      ansible.builtin.systemd:
+        name: postgres17.5.service
+      register: postgres_service
+      failed_when: false
+      changed_when: false
 
-        - name: Run PostgreSQL installation script
-          ansible.builtin.command:
-            cmd: /tmp/postgres_config.sh
-          register: postgres_result
+    - name: Copy PostgreSQL installation script
+      ansible.builtin.copy:
+        src: ./postgres_centos_stream_10.sh
+        dest: /tmp/postgres_config.sh
+        mode: '0755'
+      when: postgres_service.status.ActiveState | default('inactive') != 'active'
 
-        - name: Show PostgreSQL script output
-          ansible.builtin.debug:
-            var: postgres_result.stdout_lines
+    - name: Run PostgreSQL installation
+      ansible.builtin.command:
+        cmd: /tmp/postgres_config.sh
+      environment:
+        POSTGRES_PW: "{{ postgres_password }}"
+      register: postgres_result
+      no_log: true
+      when: postgres_service.status.ActiveState | default('inactive') != 'active'
 
-      always:
+    - name: Show PostgreSQL installation result
+      ansible.builtin.debug:
+        msg: "PostgreSQL installation completed on {{ inventory_hostname }}"
+      when: postgres_service.status.ActiveState | default('inactive') != 'active'
 
-        - name: Remove PostgreSQL installation script
-          ansible.builtin.file:
-            path: /tmp/postgres_config.sh
-            state: absent
+    - name: Remove PostgreSQL installation script
+      ansible.builtin.file:
+        path: /tmp/postgres_config.sh
+        state: absent
+      when: postgres_service.status.ActiveState | default('inactive') != 'active'
+
+    - name: PostgreSQL already running
+      ansible.builtin.debug:
+        msg: "PostgreSQL 17.5 is already running on {{ inventory_hostname }} - skipping installation"
+      when: postgres_service.status.ActiveState | default('inactive') == 'active'

@@ -4,27 +4,39 @@
   become: yes
 
   tasks:
-    - name: Ensure EPEL repository is installed
-      dnf:
+    - name: Ensure system time synchronization is active
+      ansible.builtin.systemd:
+        name: chronyd
+        state: started
+        enabled: yes
+      ignore_errors: yes
+
+    - name: Ensure EPEL repository is installed (RHEL/Rocky only)
+      ansible.builtin.dnf:
         name: epel-release
         state: present
+      when: ansible_os_family == "RedHat"
 
-    - name: Enable CRB (CodeReady Builder) repository
-      command: dnf config-manager --set-enabled crb
+    - name: Enable CRB repository (Rocky/CentOS 9)
+      ansible.builtin.command:
+        cmd: dnf config-manager --set-enabled crb
       args:
         creates: /etc/yum.repos.d/centos-crb.repo
+      when: ansible_distribution in ['Rocky', 'CentOS']
 
     - name: Ensure DNF cache is updated
-      dnf:
+      ansible.builtin.dnf:
         update_cache: yes
+      when: ansible_os_family == "RedHat"
 
     - name: Install Development Tools group
-      dnf:
+      ansible.builtin.dnf:
         name: "@Development Tools"
         state: present
+      when: ansible_os_family == "RedHat"
 
     - name: Install essential utilities, build tools, and development headers
-      dnf:
+      ansible.builtin.dnf:
         name:
           - wget
           - vim
@@ -66,47 +78,41 @@
           - bison
           - flex
           - m4
+          - firewalld
+          - fail2ban
         state: present
+      when: ansible_os_family == "RedHat"
 
     - name: Install Java Development Kit (JDK)
-      dnf:
+      ansible.builtin.dnf:
         name: java-latest-openjdk-devel
         state: present
+      when: ansible_os_family == "RedHat"
 
     - name: Add NodeSource repository for Node.js 20
-      shell: curl -sL https://rpm.nodesource.com/setup_20.x | bash -
+      ansible.builtin.shell: curl -sL https://rpm.nodesource.com/setup_20.x | bash -
       args:
         creates: /etc/yum.repos.d/nodesource-all.repo
+      when: ansible_os_family == "RedHat"
 
     - name: Install Node.js
-      dnf:
+      ansible.builtin.dnf:
         name: nodejs
         state: present
+      when: ansible_os_family == "RedHat"
 
-    - name: Ensure firewalld is installed
-      dnf:
-        name: firewalld
-        state: present
-
-    - name: Start and enable firewalld service
-      systemd:
-        name: firewalld
+    - name: Start and enable firewalld and fail2ban
+      ansible.builtin.systemd:
+        name: "{{ item }}"
         state: started
         enabled: yes
-
-    - name: Install fail2ban
-      dnf:
-        name: fail2ban
-        state: present
-
-    - name: Start and enable fail2ban service
-      systemd:
-        name: fail2ban
-        state: started
-        enabled: yes
+      loop:
+        - firewalld
+        - fail2ban
+      when: ansible_os_family == "RedHat"
 
     - name: Configure fail2ban jail for SSH defense
-      copy:
+      ansible.builtin.copy:
         dest: /etc/fail2ban/jail.local
         content: |
           [DEFAULT]
@@ -118,31 +124,26 @@
           enabled = true
       notify: Restart fail2ban
 
-    - name: OS Hardening - Disable root SSH login
-      lineinfile:
+    - name: OS Hardening - Disable root SSH login and Password Authentication
+      ansible.builtin.lineinfile:
         path: /etc/ssh/sshd_config
-        regexp: '^#?PermitRootLogin'
-        line: 'PermitRootLogin no'
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
         state: present
-      notify: Restart SSH
-
-    - name: OS Hardening - Force SSH Key Authentication (Disable Passwords)
-      lineinfile:
-        path: /etc/ssh/sshd_config
-        regexp: '^#?PasswordAuthentication'
-        line: 'PasswordAuthentication no'
-        state: present
+      loop:
+        - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
+        - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
       notify: Restart SSH
 
     - name: OS Hardening - Enforce secure default umask
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: /etc/profile
         regexp: '^umask '
         line: 'umask 027'
         state: present
 
     - name: OS Hardening - Apply secure kernel parameters (sysctl)
-      sysctl:
+      ansible.builtin.sysctl:
         name: "{{ item.key }}"
         value: "{{ item.value }}"
         state: present
@@ -160,11 +161,11 @@
 
   handlers:
     - name: Restart SSH
-      service:
+      ansible.builtin.service:
         name: sshd
         state: restarted
 
     - name: Restart fail2ban
-      service:
+      ansible.builtin.service:
         name: fail2ban
         state: restarted
