@@ -203,16 +203,6 @@ Runs after Terraform finishes, against the newly customized VMs.
 ./baseline_config.sh
 ```
 
-## Security
-
-- `.terraform.tfvars` has real credentials in plaintext — keep it in
-  `.gitignore` (`*.tfvars`), or better, use `TF_VAR_*` env vars / a secrets
-  manager.
-  
-- `allow_unverified_ssl = true` skips TLS validation — fine for a lab,
-  revisit before production.
-  
-  
 
 ## Troubleshooting
 
